@@ -51,22 +51,40 @@ All three virtual machines run natively on Apple Silicon via **UTM (QEMU 10.0 AR
 
 ### Phase 1A: Infrastructure Provisioning, Troubleshooting, & Telemetry Baseline 
 1. **Isolated ARM64 Virtualization & Network Configuration**
-- Provisioned all three VMs on native `aarch64` images in UTM using a **Host-Only** (`virtio-net-pci`) switch (`192.168.128.0/24`) with static Netplan addressing (see configs/50-cloud-init.yaml).
-- Engineering Notes: Bypassed an initial AR64 graphical installer hangup on Kali Linux via a temporary UTM serial console fallback, and resolved Xfce display profile snapping conflicts (`Connecting Displays: Do nothing`) so `spice-vdagent` scales Kali cleanly into 1/4 screen quadrant alongside active macOS Terminal SSH sessions.
+
+    - Provisioned all three VMs on native `aarch64` images in UTM using a **Host-Only** (`virtio-net-pci`) switch (`192.168.128.0/24`) with static Netplan addressing (see configs/50-cloud-init.yaml).
+    - Engineering Notes: Bypassed an initial AR64 graphical installer hangup on Kali Linux via a temporary UTM serial console fallback, and resolved Xfce display profile snapping conflicts (`Connecting Displays: Do nothing`) so `spice-vdagent` scales Kali cleanly into 1/4 screen quadrant alongside active macOS Terminal SSH sessions.
 
    ![UTM Network Isolation & ARM64 Hardware Profile](assets/01-kali-network-isolation.png)
 
    ![Kali Linux Static IP & Sub-millisecond ICMP Reachability](assets/02-kali-network-connectivity.png)
 
 2. **Wazuh SIEM Stack & Endpoint Agent Enrollment**
-- Deployed the Wazuh `v4.14.10` All-in-One stack on wazuh-siem (`.10`), confirming all four core services (`wazuh-manager`, `wazuh-indexer`, `wazuh-dashboard`, and `filebeat`) are active and healthy. 
-- Enrolled `ubuntu-victim` (`.20`) over `TCP/1514` and verified active heartbeat telemetry in the Wazuh Endpoints dashboard.
+
+    - Deployed the Wazuh `v4.14.10` All-in-One stack on wazuh-siem (`.10`), confirming all four core services (`wazuh-manager`, `wazuh-indexer`, `wazuh-dashboard`, and `filebeat`) are active and healthy. 
+    - Enrolled `ubuntu-victim` (`.20`) over `TCP/1514` and verified active heartbeat telemetry in the Wazuh Endpoints dashboard.
 
    ![Wazuh Dashboard Active Agent Telemetry](assets/03-wazuh-agent-active.png)
 
    ![Wazuh SIEM Core Services Status](assets/04-wazuh-server-services.png)
 
    ![Ubuntu Victim Baseline Network Interface](assets/05-ubuntu-victim-baseline.png)
+
+### Phase 1B: Network Reconnaissance & SSH Brute-Force Emulation (`MITRE T1046` / `T1110.001`)
+
+1. **Full-Port TCP Reconnaissance (`Nmap` / `MITRE T1046`)**
+   - Executed an unauthenticated full-port SYN/service scan (`nmap -n -Pn -v -T4 -sV -sC -p- 192.168.128.20`) from `kali` (`.30`), scanning all 65,535 TCP ports in `0.97s` and identifying `22/tcp` (`OpenSSH 9.6p1 Ubuntu 3ubuntu13.20`) as the sole exposed attack surface.
+   - *Detection Engineering Takeaway:* Confirmed that host-based log monitoring alone does not alert on half-open TCP SYN scans because `sshd` only logs connection attempts that reach the application handshake—highlighting the operational need for network-layer IDS (e.g., Suricata/Zeek) alongside endpoint telemetry.
+
+   ![Nmap Full-Port Service Discovery on Ubuntu Victim](assets/06-kali-nmap-recon.png)
+
+2. **Multi-Threaded SSH Password Guessing (`THC-Hydra` / `MITRE T1110.001`)**
+   - Launched a 4-thread `THC-Hydra` dictionary attack (`hydra -l sysadmin -P passwords.txt -t 4 ssh://192.168.128.20`) executing 15 rapid authentication attempts within 13 seconds.
+   - Verified real-time SIEM correlation in Wazuh: individual failed logins triggered **Rule Level 5** (*Password Guessing*), while the burst rate crossed Wazuh's correlation threshold to fire **Rule Level 10** (*Brute Force*) alerts mapped to **Credential Access** and **Lateral Movement**.
+
+   ![THC-Hydra 4-Thread SSH Brute-Force Execution](assets/07-kali-hydra-bruteforce.png)
+
+   ![Wazuh MITRE ATT&CK Brute-Force Alert Escalation](assets/08-wazuh-hydra-alerts.png)
 
 ---
 
