@@ -102,6 +102,34 @@ All three virtual machines run natively on Apple Silicon via **UTM (QEMU 10.0 AR
 
    ![Kali Attacker Network Isolation Verified](assets/11-kali-containment-verified.png)
 
+### Phase 2B: Purple Team Defense Evasion & Custom Detection Engineering (`Rule 100100`)
+
+To validate defense-in-depth beyond default out-of-the-box signatures, two adversary evasion drills (`MITRE T1090` / `T1110.003`) were executed against the active `firewall-drop` containment policy:
+
+1. **Drill 1 — Source IP Alias Rotation (`MITRE T1090`)**
+   - While `192.168.128.30` was actively shunned in `ubuntu-victim`'s `iptables` `INPUT` chain, a secondary IP alias (`192.168.128.31/24`) was bound to `kali`'s `eth0` interface (`ip addr add`) and forced via `ssh -b 192.168.128.31`.
+   - **Finding:** Because `firewall-drop` enforces single-IP (`data.srcip`) containment, rotating to `.31` immediately bypassed the block (`0%` ICMP packet loss and full SSH prompt access)—demonstrating why IP blacklisting is temporary containment that must be paired with key-based SSH hardening (`PasswordAuthentication no`).
+
+   ![Kali Source IP Alias Rotation Bypass](assets/12-kali-ip-rotation-bypass.png)
+
+2. **Drill 2 — Low-and-Slow Password Spraying & Threshold Evasion (`MITRE T1110.003`)**
+   - Wazuh's default `Rule 5763` requires `8` failed authentication events within `120` seconds to escalate to Level 10. Running `THC-Hydra` single-threaded with a 22-second inter-attempt delay (`hydra -l sysadmin -P spray.txt -t 1 -W 22`) completed all `6` guesses (`3.00 tries/min`) without triggering `Rule 5763` or `firewall-drop`, leaving `ubuntu-victim`'s `INPUT` chain completely open (`policy ACCEPT`).
+
+   ![Kali Low-and-Slow Password Spray Evasion](assets/13a-kali-slow-spray-evasion.png)
+
+   ![Ubuntu Victim Unblocked During Slow Spray](assets/13b-ubuntu-iptables-accept-evasion.png)
+
+3. **Custom Detection Rule Engineering (`Rule 100100`) & Responsible AI Disclosure**
+   - To close the low-and-slow correlation blind spot, custom **Rule `100100`** (Level `10`, `frequency="5"`, `timeframe="300"`, mapped to `MITRE T1110.003`) was authored in `/var/ossec/etc/rules/local_rules.xml` and wired into `ossec.conf`'s `firewall-drop` `<rules_id>` list.
+   - **Responsible AI Usage Note:** The XML logic and correlation thresholds for `Rule 100100` were generated with **Google Gemini** to address the specific threshold-evasion requirements identified during this Purple Team lab exercise. All AI-generated rule syntax, MITRE ATT&CK mappings, and Active Response bindings were human-reviewed, scoped exclusively to the isolated lab environment (`192.168.128.0/24`), and empirically validated before deployment.
+   - **Verification:** Re-running the identical 22-second-paced Hydra spray triggered `Rule 100100` on attempt #5 (`19:02:48 UTC`), automatically injecting a kernel `DROP` rule on `ubuntu-victim` and trapping Hydra attempt #6 in a `[RE-ATTEMPT]` timeout loop.
+
+   ![Custom Rule 100100 Deployment](assets/14-custom-rule-100100.png)
+
+   ![Kali Blocked on Attempt 6 by Custom Rule 100100](assets/15a-kali-slow-spray-blocked.png)
+
+   ![Ubuntu Victim Active Response Log & iptables DROP for Rule 100100](assets/15b-ubuntu-custom-rule-drop.png)
+
 ---
 
 ## Upcoming Phases
