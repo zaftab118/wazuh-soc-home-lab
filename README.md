@@ -86,11 +86,25 @@ All three virtual machines run natively on Apple Silicon via **UTM (QEMU 10.0 AR
 
    ![Wazuh MITRE ATT&CK Brute-Force Alert Escalation](assets/08-wazuh-hydra-alerts.png)
 
+### Phase 2: Automated Incident Response & Active Containment (`firewall-drop`)
+
+1. **Active Response Policy & Management Whitelisting (`ossec.conf`)**
+   - Configured Wazuh Manager (`wazuh-siem`) to trigger the built-in `firewall-drop` Active Response script (`<location>local</location>`, `<timeout>600</timeout>`) upon detecting high-severity SSH brute-force correlation alerts (**Rule `5763`** and **Rule `2502`**, Level 10).
+   - Added explicit `<white_list>` exclusions for the host management gateway (`192.168.128.1`) and SIEM server (`192.168.128.10`) to prevent accidental administrative lockout during automated remediation.
+
+   ![Wazuh Active Response Configuration](assets/09-wazuh-active-response-config.png)
+
+2. **Sub-Second `iptables` Kernel Containment & Attacker Isolation**
+   - Re-executed the 4-thread `THC-Hydra` brute-force burst from `kali` (`192.168.128.30`). Upon hitting the 8-failure correlation threshold (`Rule 5763`), `wazuh-execd` invoked `active-response/bin/firewall-drop` within 1 second, dynamically injecting a kernel-level `DROP` rule into `ubuntu-victim`'s `INPUT` chain.
+   - Verified containment from both endpoints: `ubuntu-victim` logged live dropped packets via `iptables -L INPUT -n -v` and `active-responses.log`, while `kali`'s remaining Hydra threads timed out (stretching execution from `13s` to `41s`) and subsequent ICMP probes suffered `100% packet loss`.
+
+   ![Ubuntu Victim Live iptables DROP & Active Response Log](assets/10-ubuntu-iptables-block.png)
+
+   ![Kali Attacker Network Isolation Verified](assets/11-kali-containment-verified.png)
+
 ---
 
 ## Upcoming Phases
 
-- **Phase 1B:** Network Reconnaissance (`Nmap`) & SSH Brute-Force Emulation (`THC-Hydra`/`MITRE T1110.001`)
-- **Phase 2:** Automated Incident Response & Active Containment (`firewall-drop`)
 - **Phase 3:** Real-Time File Integrity Monitoring (`Syscheck` + `auditd`/`MITRE T1565.001`)
 - **Phase 4:** Custom XML Detection Rule Engineering & Privilege Escalation (`MITRE T1548.003`)
