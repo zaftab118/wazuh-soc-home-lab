@@ -53,7 +53,7 @@ All three virtual machines run natively on Apple Silicon via **UTM (QEMU 10.0 AR
 1. **Isolated ARM64 Virtualization & Network Configuration**
 
     - Provisioned all three VMs on native `aarch64` images in UTM using a **Host-Only** (`virtio-net-pci`) switch (`192.168.128.0/24`) with static Netplan addressing (see configs/50-cloud-init.yaml).
-    - Engineering Notes: Bypassed an initial AR64 graphical installer hangup on Kali Linux via a temporary UTM serial console fallback, and resolved Xfce display profile snapping conflicts (`Connecting Displays: Do nothing`) so `spice-vdagent` scales Kali cleanly into 1/4 screen quadrant alongside active macOS Terminal SSH sessions.
+    - Engineering Notes: Bypassed an initial ARM64 graphical installer hangup on Kali Linux via a temporary UTM serial console fallback, and resolved Xfce display profile snapping conflicts (`Connecting Displays: Do nothing`) so `spice-vdagent` scales Kali cleanly into 1/4 screen quadrant alongside active macOS Terminal SSH sessions.
 
    ![UTM Network Isolation & ARM64 Hardware Profile](assets/01-kali-network-isolation.png)
 
@@ -69,6 +69,8 @@ All three virtual machines run natively on Apple Silicon via **UTM (QEMU 10.0 AR
    ![Wazuh SIEM Core Services Status](assets/04-wazuh-server-services.png)
 
    ![Ubuntu Victim Baseline Network Interface](assets/05-ubuntu-victim-baseline.png)
+
+---
 
 ### Phase 1B: Network Reconnaissance & SSH Brute-Force Emulation (`MITRE T1046` / `T1110.001`)
 
@@ -86,6 +88,8 @@ All three virtual machines run natively on Apple Silicon via **UTM (QEMU 10.0 AR
 
    ![Wazuh MITRE ATT&CK Brute-Force Alert Escalation](assets/08-wazuh-hydra-alerts.png)
 
+---
+
 ### Phase 2: Automated Incident Response & Active Containment (`firewall-drop`)
 
 1. **Active Response Policy & Management Whitelisting (`ossec.conf`)**
@@ -101,6 +105,8 @@ All three virtual machines run natively on Apple Silicon via **UTM (QEMU 10.0 AR
    ![Ubuntu Victim Live iptables DROP & Active Response Log](assets/10-ubuntu-iptables-block.png)
 
    ![Kali Attacker Network Isolation Verified](assets/11-kali-containment-verified.png)
+
+---
 
 ### Phase 2B: Purple Team Defense Evasion & Custom Detection Engineering (`Rule 100100`)
 
@@ -129,6 +135,8 @@ To validate defense-in-depth beyond default out-of-the-box signatures, two adver
    ![Kali Blocked on Attempt 6 by Custom Rule 100100](assets/15a-kali-slow-spray-blocked.png)
 
    ![Ubuntu Victim Active Response Log & iptables DROP for Rule 100100](assets/15b-ubuntu-custom-rule-drop.png)
+
+   ![Wazuh SIEM Dashboard Alert for Custom Rule 100100 (T1110.003)](assets/16-wazuh-siem-custom-rule-100100.png)
 
 ---
 
